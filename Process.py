@@ -5,22 +5,23 @@ import time
 from collections import defaultdict
 
 class Process:
-    def __init__(self, pid, host, port, neighbors):
+    def __init__(self, pid, host, port):
         self.pid = pid
         self.host = host
         self.port = port
-        self.neighbors = neighbors
-        self.balance = random.randint(1000, 5000)  # Saldo inicial
-        self.transactions = []  # Lista de transações
+        self.neighbors = {}
+        self.balance = random.randint(1000, 5000) 
+        self.transactions = []  
         self.recording = False
         self.snapshots = {}
         self.channels = defaultdict(list)
-        
+        print(f"Processo {self.pid} Balance {self.balance}")
         self.server_thread = threading.Thread(target=self.start_server, daemon=True)
         self.server_thread.start()
 
+        
+
     def start_server(self):
-        """Inicializa um servidor para receber mensagens de outros processos."""
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.bind((self.host, self.port))
         server.listen()
@@ -30,8 +31,11 @@ class Process:
             conn, addr = server.accept()
             threading.Thread(target=self.handle_client, args=(conn,), daemon=True).start()
 
+
+    def add_neighbor(self, neighbor):
+        self.neighbors[neighbor.pid] = (neighbor.host, neighbor.port)
+    
     def handle_client(self, conn):
-        """Manipula mensagens recebidas."""
         message = conn.recv(1024).decode()
         if message.startswith("TRANSFER"):
             self.handle_transaction(message)
@@ -41,7 +45,6 @@ class Process:
             print(f"Process {self.pid} recebeu mensagem desconhecida: {message}")
 
     def send_message(self, neighbor, message):
-        """Envia uma mensagem para um vizinho."""
         try:
             client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             client.connect(neighbor)
@@ -51,7 +54,6 @@ class Process:
             print(f"Process {self.pid}: Falha ao conectar a {neighbor}")
 
     def handle_transaction(self, message):
-        """Processa uma transação recebida."""
         _, sender, amount = message.split()
         sender = int(sender)
         amount = int(amount)
@@ -60,7 +62,6 @@ class Process:
         print(f"Process {self.pid} recebeu transferência de {amount} de Process {sender}. Saldo atual: {self.balance}")
 
     def transfer_money(self, to_pid, amount):
-        """Realiza uma transferência para outro processo."""
         if self.balance >= amount:
             self.balance -= amount
             self.transactions.append((self.pid, to_pid, amount))
@@ -70,7 +71,6 @@ class Process:
             print(f"Process {self.pid} tentou transferir {amount}, mas saldo insuficiente!")
 
     def handle_marker(self):
-        """Processa um marcador recebido."""
         if not self.recording:
             self.recording = True
             self.snapshots['balance'] = self.balance
@@ -80,7 +80,6 @@ class Process:
                 self.send_message(neighbor, "MARKER")
 
     def start_snapshot(self):
-        """Inicia um instantâneo global."""
         print(f"Process {self.pid} iniciando snapshot...")
         self.recording = True
         self.snapshots['balance'] = self.balance
